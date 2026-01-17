@@ -50,6 +50,34 @@ If you need custom paths, set `INSTALL_DIR` and/or `LAUNCH_AGENTS_DIR` when runn
 
 The `secreta` binary defaults to daemon mode. Use the `secret` subcommand for quick manual testing.
 
+## SDK
+
+### Go
+
+Install the Go module from this repo and use the client helper to call the socket API:
+
+```bash
+go get github.com/jptrs93/secreta/sdk/go/secretadapter
+```
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/jptrs93/secreta/sdk/go/secretadapter"
+)
+
+func main() {
+    client := secretadapter.NewClient()
+    response, err := client.FetchSecret("demo", "testing")
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println(response.SecretValue)
+}
+```
+
 ```bash
 swift run secreta secret create --name demo --value test
 swift run secreta secret fetch --name demo
