@@ -24,6 +24,8 @@ cat > "${PLIST_PATH}" <<EOF
     <key>ProgramArguments</key>
     <array>
         <string>${INSTALL_DIR}/${BIN_NAME}</string>
+        <string>daemon</string>
+        <string>run</string>
     </array>
     <key>RunAtLoad</key>
     <true/>

@@ -1,14 +1,22 @@
 import Foundation
 import Network
+import Security
+import Darwin
+
+protocol ClientIdentitySink {
+    func updateClientIdentity(_ identity: ClientIdentity)
+}
 
 final class SocketServer: @unchecked Sendable {
     private let listener: NWListener
     private let queue = DispatchQueue(label: "secreta.socket")
     private let logger = LoggerFactory.make("socket")
     private let handler: RequestHandler
+    private let identitySink: ClientIdentitySink
 
-    init(socketPath: String, handler: RequestHandler) throws {
+    init(socketPath: String, handler: RequestHandler, identitySink: ClientIdentitySink) throws {
         self.handler = handler
+        self.identitySink = identitySink
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
         params.requiredLocalEndpoint = NWEndpoint.unix(path: socketPath)
@@ -65,6 +73,9 @@ final class SocketServer: @unchecked Sendable {
     }
 
     private func handlePayload(_ payload: Data, on connection: NWConnection) {
+        if let identity = resolveIdentity(connection: connection) {
+            identitySink.updateClientIdentity(identity)
+        }
         handler.handle(payload: payload) { [weak self] responseData in
             guard let self = self else { return }
             let framed = self.frame(responseData)
@@ -82,5 +93,83 @@ final class SocketServer: @unchecked Sendable {
         var length = UInt32(data.count)
         let lengthData = Data(bytes: &length, count: MemoryLayout<UInt32>.size)
         return lengthData + data
+    }
+
+    private func resolveIdentity(connection: NWConnection) -> ClientIdentity? {
+        let endpoint = connection.endpoint
+        guard case let .unix(path) = endpoint else {
+            return nil
+        }
+        let peerPid = peerPidForSocket(path: path)
+        guard peerPid > 0, let binaryPath = binaryPathForPid(peerPid) else {
+            return ClientIdentity(cdhash: "unknown", binaryName: "unknown", binaryPath: "unknown")
+        }
+        let binaryName = URL(fileURLWithPath: binaryPath).lastPathComponent
+        let cdhash = cdhashForBinary(path: binaryPath) ?? "unknown"
+        return ClientIdentity(cdhash: cdhash, binaryName: binaryName, binaryPath: binaryPath)
+    }
+
+    private func peerPidForSocket(path: String) -> pid_t {
+        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else {
+            return 0
+        }
+        defer {
+            close(fd)
+        }
+        var address = sockaddr_un()
+        address.sun_family = sa_family_t(AF_UNIX)
+        let maxLength = MemoryLayout.size(ofValue: address.sun_path) - 1
+        _ = path.withCString { pointer in
+            withUnsafeMutablePointer(to: &address.sun_path) {
+                $0.withMemoryRebound(to: CChar.self, capacity: maxLength) { dest in
+                    strncpy(dest, pointer, maxLength)
+                }
+            }
+        }
+        let baseLength = MemoryLayout<sockaddr_un>.size
+        let nameLength = path.utf8.count + 1
+        let length = socklen_t(baseLength - MemoryLayout.size(ofValue: address.sun_path) + nameLength)
+        let connectResult = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { pointer in
+                connect(fd, pointer, length)
+            }
+        }
+        guard connectResult == 0 else {
+            return 0
+        }
+        var pid = pid_t()
+        var size = socklen_t(MemoryLayout<pid_t>.size)
+        if getsockopt(fd, 0, LOCAL_PEERPID, &pid, &size) != 0 {
+            return 0
+        }
+        return pid
+    }
+
+    private func binaryPathForPid(_ pid: pid_t) -> String? {
+        let bufferSize = 4096
+        var buffer = [UInt8](repeating: 0, count: bufferSize)
+        let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
+        guard length > 0 else {
+            return nil
+        }
+        let pathData = Data(buffer.prefix(Int(length)))
+        return String(data: pathData, encoding: .utf8)
+    }
+
+    private func cdhashForBinary(path: String) -> String? {
+        var staticCode: SecStaticCode?
+        let createStatus = SecStaticCodeCreateWithPath(URL(fileURLWithPath: path) as CFURL, [], &staticCode)
+        guard createStatus == errSecSuccess, let code = staticCode else {
+            return nil
+        }
+        var information: CFDictionary?
+        let status = SecCodeCopySigningInformation(code, [], &information)
+        guard status == errSecSuccess,
+              let info = information as? [String: Any],
+              let cdhashData = info["cdhash"] as? Data else {
+            return nil
+        }
+        return cdhashData.map { String(format: "%02x", $0) }.joined()
     }
 }

@@ -21,6 +21,15 @@ final class SecretaClient {
         return try send(method: "secret.create", params: request, responseType: SecretCreateResponse.self)
     }
 
+    func createRawSecret(name: String, secretValue: String) throws -> SecretCreateResponse {
+        return try createSecret(name: name, secretValue: secretValue, cacheSeconds: 0)
+    }
+
+    func fetchRawSecret(name: String, reason: String?) throws -> SecretAccessResponse {
+        let request = SecretAccessRequest(name: name, reason: reason)
+        return try send(method: "secret.access", params: request, responseType: SecretAccessResponse.self)
+    }
+
     func fetchSecret(name: String, reason: String?) throws -> SecretAccessResponse {
         let request = SecretAccessRequest(name: name, reason: reason)
         return try send(method: "secret.access", params: request, responseType: SecretAccessResponse.self)

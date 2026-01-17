@@ -39,7 +39,7 @@ final class SecretaTests: XCTestCase {
             auth: auth
         )
         let router = SecretRequestRouter(service: service)
-        let server = try SocketServer(socketPath: socketPath, handler: router)
+        let server = try SocketServer(socketPath: socketPath, handler: router, identitySink: policy)
         server.start()
 
         defer {

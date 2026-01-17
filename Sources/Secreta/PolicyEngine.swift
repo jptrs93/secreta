@@ -1,7 +1,8 @@
 import Foundation
 
-final class PolicyEngine {
+final class PolicyEngine: ClientIdentitySink {
     private var metadataStore: [String: StoredSecretMetadata] = [:]
+    private var currentIdentity = ClientIdentity(cdhash: "unknown", binaryName: "unknown", binaryPath: "unknown")
     private let queue = DispatchQueue(label: "secreta.policy")
 
     func recordSecret(name: String, metadata: StoredSecretMetadata) {
@@ -26,7 +27,13 @@ final class PolicyEngine {
     }
 
     func resolveClientIdentity() -> ClientIdentity {
-        return ClientIdentity(cdhash: "unknown", binaryName: "unknown", binaryPath: "unknown")
+        return queue.sync { currentIdentity }
+    }
+
+    func updateClientIdentity(_ identity: ClientIdentity) {
+        queue.sync {
+            currentIdentity = identity
+        }
     }
 
     func removeSecret(name: String) {

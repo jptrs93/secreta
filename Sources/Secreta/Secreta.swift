@@ -4,11 +4,25 @@ import Foundation
 struct SecretaApp {
     static func main() {
         let arguments = CommandLine.arguments
-        if arguments.count > 1, arguments[1] == "secret" {
-            SecretaCLI.run(arguments: Array(arguments.dropFirst(2)))
+        guard arguments.count > 1 else {
+            SecretaCLI.printUsage()
             return
         }
 
+        let command = arguments[1]
+        if command == "daemon" {
+            if arguments.count > 2, arguments[2] == "run" {
+                startDaemon()
+            } else {
+                SecretaCLI.printUsage()
+            }
+            return
+        }
+
+        SecretaCLI.run(arguments: Array(arguments.dropFirst()))
+    }
+
+    private static func startDaemon() {
         let config = AppConfig.defaultConfig()
         let logger = LoggerFactory.make("main")
         let keychain = KeychainAdapter()
@@ -28,7 +42,7 @@ struct SecretaApp {
         let router = SecretRequestRouter(service: service)
 
         do {
-            let server = try SocketServer(socketPath: config.socketPath, handler: router)
+            let server = try SocketServer(socketPath: config.socketPath, handler: router, identitySink: policy)
             logger.info("starting secreta socket on \(config.socketPath)")
             server.start()
             RunLoop.current.run()

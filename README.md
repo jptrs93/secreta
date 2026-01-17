@@ -48,11 +48,12 @@ If you need custom paths, set `INSTALL_DIR` and/or `LAUNCH_AGENTS_DIR` when runn
 
 ## CLI
 
-The `secreta` binary defaults to daemon mode. Use the `secret` subcommand for quick manual testing.
+Run the daemon with `secreta daemon run`. Use the direct commands for quick manual testing.
 
 ```bash
-swift run secreta secret create --name demo --value test
-swift run secreta secret fetch --name demo
+swift run secreta create --name demo --value test
+swift run secreta fetch --name demo
+swift run secreta file edit /path/to/myfile.secret
 ```
 
 Options:
@@ -63,6 +64,15 @@ Options:
 - `--reason` access reason for fetch
 - `delete` requires `--name`
 - `status` checks the socket health
+- `file edit <path>` opens an encrypted file editor
+
+File editing notes:
+
+- Uses `$EDITOR`, then `$VISUAL`, then `/usr/bin/vi`.
+- The file is stored encrypted at rest and saved on editor exit.
+- The per-file encryption key is stored as a normal secret named `sa:ek_<random>` and the key name is embedded in the file.
+- Moving the file preserves access because the key name travels with the encrypted payload.
+- Files must be created or re-saved with the current format (v2).
 
 ## SDK
 

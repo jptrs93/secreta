@@ -12,6 +12,8 @@ struct SecretaCLI {
         let timeoutSeconds = options.removeValue(forKey: "--timeout").flatMap(Double.init) ?? 30
         let client = SecretaClient(socketPath: socketPath, timeout: timeoutSeconds)
 
+        let positionals = positionalArguments(arguments: Array(arguments.dropFirst()))
+
         switch command {
         case "create":
             handleCreate(client: client, options: options)
@@ -21,8 +23,33 @@ struct SecretaCLI {
             handleDelete(client: client, options: options)
         case "status":
             handleStatus(client: client)
+        case "file":
+            handleFile(client: client, arguments: positionals)
         default:
             printUsage()
+        }
+    }
+
+    private static func handleFile(client: SecretaClient, arguments: [String]) {
+        guard let subcommand = arguments.first, subcommand == "edit" else {
+            printUsage()
+            return
+        }
+        guard arguments.count > 1 else {
+            printUsage()
+            return
+        }
+        let path = arguments[1]
+
+        do {
+            let editor = DefaultEditor()
+            let fileEditor = FileEditor(client: client, editor: editor)
+            let resolvedPath = try fileEditor.edit(path: path)
+            print("encrypted \(resolvedPath.path)")
+        } catch FileEditorError.noTTY {
+            print("no TTY detected; set EDITOR/VISUAL to a GUI editor with --wait")
+        } catch {
+            print("\(error)")
         }
     }
 
@@ -104,12 +131,34 @@ struct SecretaCLI {
         return options
     }
 
-    private static func printUsage() {
-        print("secreta secret <command> [options]")
+    private static func positionalArguments(arguments: [String]) -> [String] {
+        var positionals: [String] = []
+        var index = 0
+        while index < arguments.count {
+            let argument = arguments[index]
+            if argument.hasPrefix("--") {
+                let nextIndex = index + 1
+                if nextIndex < arguments.count {
+                    index += 2
+                } else {
+                    index += 1
+                }
+                continue
+            }
+            positionals.append(argument)
+            index += 1
+        }
+        return positionals
+    }
+
+    static func printUsage() {
+        print("secreta <command> [options]")
         print("commands:")
         print("  create --name <name> --value <value> [--cache-seconds <seconds>] [--socket <path>] [--timeout <seconds>]")
         print("  fetch --name <name> [--reason <reason>] [--socket <path>] [--timeout <seconds>]")
         print("  delete --name <name> [--socket <path>] [--timeout <seconds>]")
         print("  status [--socket <path>] [--timeout <seconds>]")
+        print("  file edit <path> [--socket <path>] [--timeout <seconds>]")
+        print("  daemon run")
     }
 }

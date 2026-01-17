@@ -35,6 +35,9 @@ final class SecretService {
     }
 
     private func storedName(for name: String) -> String {
+        if name.hasPrefix("sa:") {
+            return name
+        }
         return "sm:\(name)"
     }
 
@@ -57,7 +60,7 @@ final class SecretService {
         let requiresAuth = !cache.hasValidCache(for: identity.cdhash, secretName: request.name)
         var authSatisfied = false
         if requiresAuth {
-            let prompt = "\(identity.binaryName) is requesting access to \(request.name)"
+            let prompt = authPrompt(identity: identity, request: request)
             authSatisfied = auth.evaluate(prompt: prompt)
             if !authSatisfied {
                 recordAccess(identity: identity, secretName: request.name, result: "auth_failed", metadata: metadata)
@@ -111,6 +114,15 @@ final class SecretService {
 
     func healthStatus() -> HealthResponse {
         return HealthResponse(version: "0.1.0", uptime: Date().timeIntervalSince(startDate))
+    }
+
+    private func authPrompt(identity: ClientIdentity, request: SecretAccessRequest) -> String {
+        let description = "\(identity.binaryName) (\(identity.binaryPath))"
+        if let reason = request.reason, reason.hasPrefix("file.decrypt:") {
+            let filePath = reason.replacingOccurrences(of: "file.decrypt:", with: "")
+            return "decrypt file \(filePath) for \(description)"
+        }
+        return "access secret \(request.name) for \(description)"
     }
 
     private func recordAccess(identity: ClientIdentity, secretName: String, result: String, metadata: StoredSecretMetadata) {
