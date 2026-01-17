@@ -28,4 +28,10 @@ final class CacheManager {
     private func cacheKey(clientCdhash: String, secretName: String) -> String {
         return "\(clientCdhash)::\(secretName)"
     }
+
+    func removeCache(for secretName: String) {
+        queue.sync {
+            cache = cache.filter { $0.value.secretName != secretName }
+        }
+    }
 }

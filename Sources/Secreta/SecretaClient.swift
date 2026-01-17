@@ -26,6 +26,15 @@ final class SecretaClient {
         return try send(method: "secret.access", params: request, responseType: SecretAccessResponse.self)
     }
 
+    func deleteSecret(name: String) throws -> SecretDeleteResponse {
+        let request = SecretDeleteRequest(name: name)
+        return try send(method: "secret.delete", params: request, responseType: SecretDeleteResponse.self)
+    }
+
+    func healthStatus() throws -> HealthResponse {
+        return try send(method: "health.ping", params: EmptyParams(), responseType: HealthResponse.self)
+    }
+
     private func send<P: Encodable, R: Decodable>(method: String, params: P, responseType: R.Type) throws -> R {
         let requestId = UUID()
         let paramsData = try codec.encodeResult(params)

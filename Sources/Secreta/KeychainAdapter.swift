@@ -51,6 +51,15 @@ final class KeychainAdapter {
         return decodeMetadata(data)
     }
 
+    func deleteSecret(name: String) -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: name
+        ]
+        let status = SecItemDelete(query as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
+    }
+
     private func encodeMetadata(_ metadata: StoredSecretMetadata) -> Data {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601

@@ -28,4 +28,10 @@ final class PolicyEngine {
     func resolveClientIdentity() -> ClientIdentity {
         return ClientIdentity(cdhash: "unknown", binaryName: "unknown", binaryPath: "unknown")
     }
+
+    func removeSecret(name: String) {
+        _ = queue.sync {
+            metadataStore.removeValue(forKey: name)
+        }
+    }
 }

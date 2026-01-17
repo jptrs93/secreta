@@ -26,6 +26,9 @@ final class SecretRequestRouter: RequestHandler {
             case "secret.meta":
                 let request = try codec.decodeParams(SecretAccessRequest.self, from: envelope.params)
                 handleMeta(request: request, envelope: envelope, completion: completion)
+            case "secret.delete":
+                let request = try codec.decodeParams(SecretDeleteRequest.self, from: envelope.params)
+                handleDelete(request: request, envelope: envelope, completion: completion)
             case "health.ping":
                 handleHealth(envelope: envelope, completion: completion)
             default:
@@ -57,6 +60,16 @@ final class SecretRequestRouter: RequestHandler {
         switch response {
         case .success(let meta):
             completion(encodeResult(meta, requestId: envelope.requestId))
+        case .failure(let error):
+            completion(errorEnvelope(for: envelope.requestId, code: error.code, message: error.message))
+        }
+    }
+
+    private func handleDelete(request: SecretDeleteRequest, envelope: RequestEnvelope, completion: @escaping (Data) -> Void) {
+        let response = service.deleteSecret(name: request.name)
+        switch response {
+        case .success(let result):
+            completion(encodeResult(result, requestId: envelope.requestId))
         case .failure(let error):
             completion(errorEnvelope(for: envelope.requestId, code: error.code, message: error.message))
         }

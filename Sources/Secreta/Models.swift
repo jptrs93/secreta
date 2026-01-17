@@ -12,6 +12,8 @@ struct RequestEnvelope: Codable {
     let params: Data
 }
 
+struct EmptyParams: Codable {}
+
 struct ResponseEnvelope: Codable {
     let requestId: UUID
     let result: Data?
@@ -54,6 +56,14 @@ struct SecretMetaResponse: Codable {
     let cacheSeconds: Int
     let lastAccessAt: Date?
     let createdAt: Date
+}
+
+struct SecretDeleteRequest: Codable {
+    let name: String
+}
+
+struct SecretDeleteResponse: Codable {
+    let deleted: Bool
 }
 
 struct HealthResponse: Codable {

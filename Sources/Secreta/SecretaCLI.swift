@@ -17,6 +17,10 @@ struct SecretaCLI {
             handleCreate(client: client, options: options)
         case "fetch":
             handleFetch(client: client, options: options)
+        case "delete":
+            handleDelete(client: client, options: options)
+        case "status":
+            handleStatus(client: client)
         default:
             printUsage()
         }
@@ -52,6 +56,33 @@ struct SecretaCLI {
         }
     }
 
+    private static func handleDelete(client: SecretaClient, options: [String: String]) {
+        guard let name = options["--name"] else {
+            printUsage()
+            return
+        }
+
+        do {
+            let response = try client.deleteSecret(name: name)
+            if response.deleted {
+                print("deleted secret \(name)")
+            } else {
+                print("failed to delete \(name)")
+            }
+        } catch {
+            print("\(error)")
+        }
+    }
+
+    private static func handleStatus(client: SecretaClient) {
+        do {
+            let response = try client.healthStatus()
+            print("ok version=\(response.version) uptime=\(Int(response.uptime))s")
+        } catch {
+            print("\(error)")
+        }
+    }
+
     private static func parseOptions(arguments: [String]) -> [String: String] {
         var options: [String: String] = [:]
         var index = 0
@@ -78,5 +109,7 @@ struct SecretaCLI {
         print("commands:")
         print("  create --name <name> --value <value> [--cache-seconds <seconds>] [--socket <path>] [--timeout <seconds>]")
         print("  fetch --name <name> [--reason <reason>] [--socket <path>] [--timeout <seconds>]")
+        print("  delete --name <name> [--socket <path>] [--timeout <seconds>]")
+        print("  status [--socket <path>] [--timeout <seconds>]")
     }
 }

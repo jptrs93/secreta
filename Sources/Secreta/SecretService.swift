@@ -68,6 +68,31 @@ final class SecretService {
         return .success(response)
     }
 
+    func deleteSecret(name: String) -> Result<SecretDeleteResponse, ServiceError> {
+        guard let metadata = policy.metadata(for: name) else {
+            return .failure(ServiceError(code: "not_found", message: "Unknown secret"))
+        }
+        let storedName = "sm:\(metadata.cacheSeconds):\(name)"
+        let deleted = keychain.deleteSecret(name: storedName)
+        policy.removeSecret(name: name)
+        cache.removeCache(for: name)
+
+        let identity = policy.resolveClientIdentity()
+        let event = AuditEvent(
+            requestId: UUID(),
+            timestamp: Date(),
+            client: identity,
+            action: "secret.delete",
+            secretName: name,
+            result: deleted ? "success" : "failed",
+            metadata: ["cache_seconds": String(metadata.cacheSeconds)]
+        )
+        auditLogger.log(event)
+        notificationBridge.postSecretAccess(event: event)
+
+        return .success(SecretDeleteResponse(deleted: deleted))
+    }
+
     func healthStatus() -> HealthResponse {
         return HealthResponse(version: "0.1.0", uptime: Date().timeIntervalSince(startDate))
     }
