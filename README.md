@@ -20,7 +20,7 @@ Authentication prompts shown to the user are local authentication challenges fro
 
 The primary API paths are available:
 
-1. Create a secret: The client supplies a secret name and value, plus an optional cache TTL. The agent stores the secret in the keychain using the naming pattern `sm:<cache_seconds>:<name>` and records policy metadata. A cache TTL of `0` means every access requires a fresh authorization; otherwise, access is cached in memory per app until the TTL expires.
+1. Create a secret: The client supplies a secret name and value, plus an optional cache TTL. The agent stores the secret in the keychain using the naming pattern `sm:<name>` and records metadata including the cache TTL. A cache TTL of `0` means every access requires a fresh authorization; otherwise, access is cached in memory per app until the TTL expires.
 2. Access a secret: The client requests a named secret. The agent checks per-app policy and in-memory cache to determine if a local authentication challenge is required. If needed, the agent prompts with app and secret context before returning the secret. Every access attempt emits an audit notification regardless of whether a prompt was shown.
 3. Delete a secret: The client requests removal of a named secret. The agent clears policy metadata and in-memory cache, deletes the keychain item, and emits an audit event describing the outcome.
 
@@ -28,7 +28,7 @@ The primary API paths are available:
 
 Build and install a user-level launch agent with the provided scripts. This installs the release binary into `~/.local/bin` by default and registers a LaunchAgent under `~/Library/LaunchAgents` so the daemon starts at login.
 
-The install script does the following:
+The install script has the following effects on your machine:
 
 - Installs the `secreta` binary into `~/.local/bin` (or the `INSTALL_DIR` override).
 - Registers `com.secreta.agent` under `~/Library/LaunchAgents` for auto-start.

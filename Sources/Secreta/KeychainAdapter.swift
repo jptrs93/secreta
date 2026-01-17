@@ -2,10 +2,7 @@ import Foundation
 import Security
 
 final class KeychainAdapter {
-    private let accessGroup: String?
-
-    init(accessGroup: String? = nil) {
-        self.accessGroup = accessGroup
+    init() {
     }
 
     func storeSecret(name: String, secret: String, metadata: StoredSecretMetadata) {
@@ -35,6 +32,15 @@ final class KeychainAdapter {
         return String(data: data, encoding: .utf8)
     }
 
+    func deleteSecret(name: String) -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: name
+        ]
+        let status = SecItemDelete(query as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
+    }
+
     func readMetadata(name: String) -> StoredSecretMetadata? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -49,15 +55,6 @@ final class KeychainAdapter {
             return nil
         }
         return decodeMetadata(data)
-    }
-
-    func deleteSecret(name: String) -> Bool {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: name
-        ]
-        let status = SecItemDelete(query as CFDictionary)
-        return status == errSecSuccess || status == errSecItemNotFound
     }
 
     private func encodeMetadata(_ metadata: StoredSecretMetadata) -> Data {
