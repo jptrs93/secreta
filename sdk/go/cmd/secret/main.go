@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/jptrs93/secretadapter/sdk/go/secretadapter"
+	"github.com/jptrs93/secreta/sdk/go/secreta"
 )
 
 func main() {
@@ -20,7 +20,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	client := secretadapter.NewClient()
+	client := secreta.NewClient()
 	if *socketPath != "" {
 		client.SocketPath = *socketPath
 	}
@@ -39,7 +39,7 @@ func main() {
 	}
 }
 
-func handleCreate(client *secretadapter.Client, args []string) {
+func handleCreate(client *secreta.Client, args []string) {
 	fs := flag.NewFlagSet("create", flag.ExitOnError)
 	name := fs.String("name", "", "Secret name")
 	value := fs.String("value", "", "Secret value")
@@ -65,7 +65,7 @@ func handleCreate(client *secretadapter.Client, args []string) {
 	fmt.Printf("created secret %s (cache %ds)\n", response.StoredName, response.CacheSeconds)
 }
 
-func handleFetch(client *secretadapter.Client, args []string) {
+func handleFetch(client *secreta.Client, args []string) {
 	fs := flag.NewFlagSet("fetch", flag.ExitOnError)
 	name := fs.String("name", "", "Secret name")
 	reason := fs.String("reason", "", "Reason for access")

@@ -1,4 +1,4 @@
-package secretadapter
+package secreta
 
 import (
 	"bytes"

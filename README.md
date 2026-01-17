@@ -71,7 +71,7 @@ Options:
 Install the Go module from this repo and use the client helper to call the socket API:
 
 ```bash
-go get github.com/jptrs93/secreta/sdk/go/secretadapter
+go get github.com/jptrs93/secreta/sdk/go/secreta
 ```
 
 ```go
@@ -79,11 +79,11 @@ package main
 
 import (
     "fmt"
-    "github.com/jptrs93/secreta/sdk/go/secretadapter"
+    "github.com/jptrs93/secreta/sdk/go/secreta"
 )
 
 func main() {
-    client := secretadapter.NewClient()
+    client := secreta.NewClient()
     response, err := client.FetchSecret("demo", "testing")
     if err != nil {
         panic(err)
