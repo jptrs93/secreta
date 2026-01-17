@@ -2,8 +2,6 @@ import Foundation
 import Security
 
 final class KeychainAdapter {
-    init() {
-    }
 
     func storeSecret(name: String, secret: String, metadata: StoredSecretMetadata) {
         let metaData = encodeMetadata(metadata)

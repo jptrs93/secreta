@@ -50,6 +50,20 @@ If you need custom paths, set `INSTALL_DIR` and/or `LAUNCH_AGENTS_DIR` when runn
 
 The `secreta` binary defaults to daemon mode. Use the `secret` subcommand for quick manual testing.
 
+```bash
+swift run secreta secret create --name demo --value test
+swift run secreta secret fetch --name demo
+```
+
+Options:
+
+- `--socket` override the Unix socket path (default: /tmp/secreta.sock)
+- `--timeout` socket timeout in seconds
+- `--cache-seconds` cache TTL for create
+- `--reason` access reason for fetch
+- `delete` requires `--name`
+- `status` checks the socket health
+
 ## SDK
 
 ### Go
@@ -77,17 +91,3 @@ func main() {
     fmt.Println(response.SecretValue)
 }
 ```
-
-```bash
-swift run secreta secret create --name demo --value test
-swift run secreta secret fetch --name demo
-```
-
-Options:
-
-- `--socket` override the Unix socket path (default: /tmp/secreta.sock)
-- `--timeout` socket timeout in seconds
-- `--cache-seconds` cache TTL for create
-- `--reason` access reason for fetch
-- `delete` requires `--name`
-- `status` checks the socket health

@@ -26,7 +26,7 @@ final class SecretService {
 
     func createSecret(request: SecretCreateRequest) -> SecretCreateResponse {
         let cacheSeconds = max(request.cacheSeconds ?? 0, 0)
-        let storedName = "sm:\(request.name)"
+        let storedName = storedName(for: request.name)
         let secretId = UUID().uuidString
         let metadata = StoredSecretMetadata(cacheSeconds: cacheSeconds, createdAt: Date(), lastAccessAt: nil)
         keychain.storeSecret(name: storedName, secret: request.secretValue, metadata: metadata)
@@ -34,11 +34,25 @@ final class SecretService {
         return SecretCreateResponse(secretId: secretId, storedName: storedName, cacheSeconds: cacheSeconds)
     }
 
+    private func storedName(for name: String) -> String {
+        return "sm:\(name)"
+    }
+
+    private func loadMetadata(for name: String) -> StoredSecretMetadata? {
+        if let existing = policy.metadata(for: name) {
+            return existing
+        }
+        guard let metadata = keychain.readMetadata(name: storedName(for: name)) else {
+            return nil
+        }
+        policy.recordSecret(name: name, metadata: metadata)
+        return metadata
+    }
+
     func accessSecret(request: SecretAccessRequest) -> Result<SecretAccessResponse, ServiceError> {
-        guard let metadata = policy.metadata(for: request.name) ?? keychain.readMetadata(name: "sm:\(request.name)") else {
+        guard let metadata = loadMetadata(for: request.name) else {
             return .failure(ServiceError(code: "not_found", message: "Unknown secret"))
         }
-        policy.recordSecret(name: request.name, metadata: metadata)
         let identity = policy.resolveClientIdentity()
         let requiresAuth = !cache.hasValidCache(for: identity.cdhash, secretName: request.name)
         var authSatisfied = false
@@ -51,7 +65,8 @@ final class SecretService {
             }
             cache.storeCache(for: identity.cdhash, secretName: request.name, cacheSeconds: metadata.cacheSeconds)
         }
-        guard let secret = keychain.readSecret(name: "sm:\(request.name)") else {
+        let storedName = storedName(for: request.name)
+        guard let secret = keychain.readSecret(name: storedName) else {
             recordAccess(identity: identity, secretName: request.name, result: "not_found", metadata: metadata)
             return .failure(ServiceError(code: "not_found", message: "Secret missing in keychain"))
         }
@@ -62,17 +77,16 @@ final class SecretService {
     }
 
     func secretMeta(name: String) -> Result<SecretMetaResponse, ServiceError> {
-        guard let metadata = policy.metadata(for: name) ?? keychain.readMetadata(name: "sm:\(name)") else {
+        guard let metadata = loadMetadata(for: name) else {
             return .failure(ServiceError(code: "not_found", message: "Unknown secret"))
         }
-        policy.recordSecret(name: name, metadata: metadata)
         let response = SecretMetaResponse(cacheSeconds: metadata.cacheSeconds, lastAccessAt: metadata.lastAccessAt, createdAt: metadata.createdAt)
         return .success(response)
     }
 
     func deleteSecret(name: String) -> Result<SecretDeleteResponse, ServiceError> {
-        let metadata = policy.metadata(for: name) ?? keychain.readMetadata(name: "sm:\(name)")
-        let deleted = keychain.deleteSecret(name: "sm:\(name)")
+        let metadata = loadMetadata(for: name)
+        let deleted = keychain.deleteSecret(name: storedName(for: name))
         if !deleted {
             return .failure(ServiceError(code: "not_found", message: "Unknown secret"))
         }
