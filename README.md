@@ -26,7 +26,7 @@ The primary API paths are available:
 
 ## Installation
 
-Build and install a user-level launch agent with the provided scripts. This installs the release binary into `~/.local/bin` by default and registers a LaunchAgent under `~/Library/LaunchAgents` so the daemon starts at login.
+Build and install a user-level launch agent with the provided scripts. This installs the release binary into `~/.local/bin` by default, builds a daemon app bundle in `~/Applications/SecretaDaemon.app`, and registers a LaunchAgent under `~/Library/LaunchAgents` so the daemon starts at login.
 
 The install script has the following effects on your machine:
 
@@ -44,7 +44,15 @@ You can uninstall and remove the LaunchAgent with:
 ./scripts/uninstall.sh
 ```
 
-If you need custom paths, set `INSTALL_DIR` and/or `LAUNCH_AGENTS_DIR` when running the scripts.
+If you need custom paths, set `INSTALL_DIR`, `APP_INSTALL_DIR`, and/or `LAUNCH_AGENTS_DIR` when running the scripts.
+
+## Logs
+
+Audit logs are emitted through macOS unified logging under the `com.secreta` subsystem.
+
+```bash
+/usr/bin/log show --info --predicate 'subsystem == "com.secreta"' --last 10m
+```
 
 ## CLI
 

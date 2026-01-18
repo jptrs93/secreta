@@ -35,6 +35,11 @@ final class SecretaClient {
         return try send(method: "secret.access", params: request, responseType: SecretAccessResponse.self)
     }
 
+    func readFile(path: String, reason: String?) throws -> FileReadResponse {
+        let request = FileReadRequest(path: path, reason: reason)
+        return try send(method: "file.read", params: request, responseType: FileReadResponse.self)
+    }
+
     func deleteSecret(name: String) throws -> SecretDeleteResponse {
         let request = SecretDeleteRequest(name: name)
         return try send(method: "secret.delete", params: request, responseType: SecretDeleteResponse.self)

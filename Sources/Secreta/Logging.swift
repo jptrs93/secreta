@@ -1,5 +1,6 @@
 import Foundation
 import os.log
+import UserNotifications
 
 enum LoggerFactory {
     static let subsystem = "com.secreta"
@@ -23,32 +24,51 @@ final class AuditLogger {
     private let logger = LoggerFactory.make("audit")
 
     func log(_ event: AuditEvent) {
-        if let data = try? JSONEncoder().encode(event),
-           let payload = String(data: data, encoding: .utf8) {
-            logger.info("audit=")
-            logger.info("\(payload, privacy: .private)")
-        } else {
-            logger.info("audit=failed_to_encode")
+        var details = ""
+        if let metadata = event.metadata,
+           let cacheSeconds = metadata["cache_seconds"] {
+            details = " cache_seconds=\(cacheSeconds)"
         }
+        logger.info("audit action=\(event.action, privacy: .public) secret=\(event.secretName, privacy: .public) result=\(event.result, privacy: .public) client=\(event.client.binaryName, privacy: .public)\(details, privacy: .public)")
     }
 }
 
 final class NotificationCenterBridge {
-    private let notificationCenter = DistributedNotificationCenter.default()
+    private let notificationCenter = UNUserNotificationCenter.current()
+    private let logger = LoggerFactory.make("notification")
+
+    init() {
+        let logger = logger
+        notificationCenter.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if let error {
+                let nsError = error as NSError
+                logger.error("notification_auth_error domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public) desc=\(nsError.localizedDescription, privacy: .public)")
+            } else {
+                logger.info("notification_auth_granted=\(granted)")
+            }
+        }
+    }
 
     func postSecretAccess(event: AuditEvent) {
-        let name = Notification.Name("com.secreta.access")
-        var userInfo: [String: Any] = [
-            "request_id": event.requestId.uuidString,
-            "client_name": event.client.binaryName,
-            "client_path": event.client.binaryPath,
-            "secret_name": event.secretName,
-            "result": event.result,
-            "timestamp": event.timestamp.timeIntervalSince1970
-        ]
-        if let metadata = event.metadata {
-            userInfo["metadata"] = metadata
+        let content = UNMutableNotificationContent()
+        content.title = "Secreta Audit"
+        content.subtitle = event.action
+        content.body = "\(event.client.binaryName) \(event.result) \(event.secretName)"
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: event.requestId.uuidString,
+            content: content,
+            trigger: nil
+        )
+        let logger = logger
+        notificationCenter.add(request) { error in
+            if let error {
+                let nsError = error as NSError
+                logger.error("notification_post_error domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public) desc=\(nsError.localizedDescription, privacy: .public)")
+            } else {
+                logger.info("notification_posted=\(event.action, privacy: .public)")
+            }
         }
-        notificationCenter.post(name: name, object: nil, userInfo: userInfo)
     }
 }

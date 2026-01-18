@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"path/filepath"
 	"time"
 )
 
@@ -65,10 +66,19 @@ type SecretAccessResponse struct {
 	AuthSatisfied bool   `json:"authSatisfied"`
 }
 
+type FileReadRequest struct {
+	Path   string `json:"path"`
+	Reason string `json:"reason,omitempty"`
+}
+
+type FileReadResponse struct {
+	Plaintext string `json:"plaintext"`
+}
+
 func NewClient() *Client {
 	return &Client{
 		SocketPath: defaultSocketPath,
-		Timeout:    5 * time.Second,
+		Timeout:    45 * time.Second,
 	}
 }
 
@@ -114,12 +124,35 @@ func (c *Client) FetchSecret(name string, reason string) (*SecretAccessResponse,
 	return &result, nil
 }
 
+func (c *Client) ReadFile(path string, reason string) (*FileReadResponse, error) {
+	resolved := path
+	if !filepath.IsAbs(path) {
+		if abs, err := filepath.Abs(path); err == nil {
+			resolved = abs
+		}
+	}
+	request := FileReadRequest{
+		Path:   resolved,
+		Reason: reason,
+	}
+	payload, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+	response, err := c.sendRequest("file.read", payload)
+	if err != nil {
+		return nil, err
+	}
+	var result FileReadResponse
+	if err := json.Unmarshal(response, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *Client) sendRequest(method string, params []byte) ([]byte, error) {
 	if c.SocketPath == "" {
 		c.SocketPath = defaultSocketPath
-	}
-	if c.Timeout == 0 {
-		c.Timeout = 5 * time.Second
 	}
 
 	requestID, err := newRequestID()

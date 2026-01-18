@@ -1,8 +1,101 @@
 import CryptoKit
-import CryptoKit
 import Darwin
 import Foundation
 import Security
+
+enum FileCryptoPayload {
+    case plaintext(Data)
+    case encrypted(EncryptedPayload)
+
+    struct EncryptedPayload {
+        let keyName: String
+        let nonce: Data
+        let ciphertext: Data
+        let tag: Data
+    }
+}
+
+enum FileCryptoError: Error {
+    case invalidPayload
+    case unsupportedVersion
+}
+
+struct FileCrypto {
+    private static let magic = Data("SEFT".utf8)
+
+    static func decodePayload(_ encoded: Data) throws -> FileCryptoPayload {
+        if encoded.isEmpty {
+            return .plaintext(Data())
+        }
+        guard let decoded = Data(base64Encoded: encoded) else {
+            return .plaintext(encoded)
+        }
+        guard decoded.starts(with: magic) else {
+            return .plaintext(encoded)
+        }
+        guard decoded.count > 21 else {
+            throw FileCryptoError.invalidPayload
+        }
+        let version = decoded[4]
+        guard version == 2 else {
+            throw FileCryptoError.unsupportedVersion
+        }
+        let keyNameLength = decoded[5]
+        guard keyNameLength > 0 else {
+            throw FileCryptoError.invalidPayload
+        }
+        let keyStart = 6
+        let keyEnd = keyStart + Int(keyNameLength)
+        guard decoded.count > keyEnd + 12 + 16 else {
+            throw FileCryptoError.invalidPayload
+        }
+        let keyNameData = decoded[keyStart..<keyEnd]
+        guard let keyName = String(data: keyNameData, encoding: .utf8) else {
+            throw FileCryptoError.invalidPayload
+        }
+        let nonceStart = keyEnd
+        let nonceEnd = nonceStart + 12
+        let nonceData = Data(decoded[nonceStart..<nonceEnd])
+        let ciphertext = Data(decoded[nonceEnd...])
+        guard ciphertext.count > 16 else {
+            throw FileCryptoError.invalidPayload
+        }
+        let payload = FileCryptoPayload.EncryptedPayload(
+            keyName: keyName,
+            nonce: nonceData,
+            ciphertext: Data(ciphertext.dropLast(16)),
+            tag: Data(ciphertext.suffix(16))
+        )
+        return .encrypted(payload)
+    }
+
+    static func decryptPayload(_ payload: FileCryptoPayload.EncryptedPayload, key: SymmetricKey) throws -> Data {
+        let nonce = try AES.GCM.Nonce(data: payload.nonce)
+        let sealedBox = try AES.GCM.SealedBox(nonce: nonce, ciphertext: payload.ciphertext, tag: payload.tag)
+        return try AES.GCM.open(sealedBox, using: key)
+    }
+
+    static func encryptPayload(plaintext: Data, keyName: String, key: SymmetricKey) throws -> Data {
+        guard let keyNameData = keyName.data(using: .utf8), keyNameData.count <= 255 else {
+            throw FileCryptoError.invalidPayload
+        }
+        let sealedBox = try AES.GCM.seal(plaintext, using: key)
+        let header = magic + Data([2, UInt8(keyNameData.count)]) + keyNameData
+        let payload = header + Data(sealedBox.nonce) + sealedBox.ciphertext + sealedBox.tag
+        return payload.base64EncodedData()
+    }
+}
+
+struct FilePathResolver {
+    static func resolve(_ path: String) -> URL {
+        let inputUrl = URL(fileURLWithPath: path)
+        let absoluteUrl = inputUrl.isFileURL && inputUrl.path.hasPrefix("/")
+            ? inputUrl
+            : URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                .appendingPathComponent(path)
+        return absoluteUrl.standardizedFileURL.resolvingSymlinksInPath()
+    }
+}
 
 protocol FileEditorClient {
     func createRawSecret(name: String, secretValue: String) throws -> SecretCreateResponse
@@ -45,12 +138,7 @@ final class FileEditor {
     }
 
     private func resolvePath(_ path: String) throws -> URL {
-        let inputUrl = URL(fileURLWithPath: path)
-        let absoluteUrl = inputUrl.isFileURL && inputUrl.path.hasPrefix("/")
-            ? inputUrl
-            : URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-                .appendingPathComponent(path)
-        return absoluteUrl.standardizedFileURL.resolvingSymlinksInPath()
+        return FilePathResolver.resolve(path)
     }
 
     private struct FileState {
@@ -64,52 +152,22 @@ final class FileEditor {
             return try newFileState(plaintext: Data())
         }
         let encoded = try Data(contentsOf: filePath)
-        guard !encoded.isEmpty else {
-            return try newFileState(plaintext: Data())
-        }
-        guard let decoded = Data(base64Encoded: encoded) else {
-            return try newFileState(plaintext: encoded)
-        }
-        let magic = Data("SEFT".utf8)
-        if !decoded.starts(with: magic) {
-            return try newFileState(plaintext: encoded)
-        }
-        guard decoded.count > 21 else {
+        let payload: FileCryptoPayload
+        do {
+            payload = try FileCrypto.decodePayload(encoded)
+        } catch FileCryptoError.invalidPayload {
             throw FileEditorError.invalidPayload
-        }
-        let version = decoded[4]
-        guard version == 2 else {
+        } catch FileCryptoError.unsupportedVersion {
             throw FileEditorError.unsupportedVersion
         }
-        let keyNameLength = decoded[5]
-        guard keyNameLength > 0 else {
-            throw FileEditorError.invalidPayload
+        switch payload {
+        case .plaintext(let plaintext):
+            return try newFileState(plaintext: plaintext)
+        case .encrypted(let encrypted):
+            let keyData = try fetchExistingKey(name: encrypted.keyName, reason: "file.decrypt:\(filePath.path)")
+            let plaintext = try FileCrypto.decryptPayload(encrypted, key: keyData)
+            return FileState(keyName: encrypted.keyName, key: keyData, plaintext: plaintext)
         }
-        let keyStart = 6
-        let keyEnd = keyStart + Int(keyNameLength)
-        guard decoded.count > keyEnd + 12 + 16 else {
-            throw FileEditorError.invalidPayload
-        }
-        let keyNameData = decoded[keyStart..<keyEnd]
-        guard let keyName = String(data: keyNameData, encoding: .utf8) else {
-            throw FileEditorError.invalidPayload
-        }
-        let nonceStart = keyEnd
-        let nonceEnd = nonceStart + 12
-        let nonceData = Data(decoded[nonceStart..<nonceEnd])
-        let ciphertext = Data(decoded[nonceEnd...])
-        guard ciphertext.count > 16 else {
-            throw FileEditorError.invalidPayload
-        }
-        let keyData = try fetchExistingKey(name: keyName, reason: "file.decrypt:\(filePath.path)")
-        let nonce = try AES.GCM.Nonce(data: nonceData)
-        let sealedBox = try AES.GCM.SealedBox(
-            nonce: nonce,
-            ciphertext: Data(ciphertext.dropLast(16)),
-            tag: Data(ciphertext.suffix(16))
-        )
-        let plaintext = try AES.GCM.open(sealedBox, using: keyData)
-        return FileState(keyName: keyName, key: keyData, plaintext: plaintext)
     }
 
     private func newFileState(plaintext: Data) throws -> FileState {
@@ -162,17 +220,14 @@ final class FileEditor {
     }
 
     private func encryptAndWrite(plaintext: Data, keyName: String, keyData: SymmetricKey, destination: URL) throws {
-        guard let keyNameData = keyName.data(using: .utf8) else {
+        let encoded: Data
+        do {
+            encoded = try FileCrypto.encryptPayload(plaintext: plaintext, keyName: keyName, key: keyData)
+        } catch FileCryptoError.invalidPayload {
             throw FileEditorError.invalidPayload
+        } catch {
+            throw error
         }
-        guard keyNameData.count <= 255 else {
-            throw FileEditorError.invalidPayload
-        }
-        let sealedBox = try AES.GCM.seal(plaintext, using: keyData)
-        let header = Data("SEFT".utf8) + Data([2, UInt8(keyNameData.count)]) + keyNameData
-        let payload = header + Data(sealedBox.nonce) + sealedBox.ciphertext + sealedBox.tag
-        let encoded = payload.base64EncodedData()
-
         let directory = destination.deletingLastPathComponent()
         let tempUrl = directory.appendingPathComponent(".secreta-tmp-\(UUID().uuidString)")
         try encoded.write(to: tempUrl, options: .atomic)

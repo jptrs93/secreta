@@ -33,6 +33,8 @@ func main() {
 		handleCreate(client, args[1:])
 	case "fetch":
 		handleFetch(client, args[1:])
+	case "read":
+		handleRead(client, args[1:])
 	default:
 		printUsage()
 		os.Exit(1)
@@ -85,9 +87,30 @@ func handleFetch(client *secreta.Client, args []string) {
 	fmt.Println(response.SecretValue)
 }
 
+func handleRead(client *secreta.Client, args []string) {
+	fs := flag.NewFlagSet("read", flag.ExitOnError)
+	path := fs.String("path", "", "File path")
+	reason := fs.String("reason", "", "Reason for access")
+	fs.Parse(args)
+
+	if *path == "" {
+		fmt.Fprintln(os.Stderr, "path is required")
+		os.Exit(1)
+	}
+
+	response, err := client.ReadFile(*path, *reason)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	fmt.Println(response.Plaintext)
+}
+
 func printUsage() {
 	fmt.Println("secret <command> [options]")
 	fmt.Println("commands:")
 	fmt.Println("  create --name <name> --value <value> [--cache-seconds <seconds>]")
 	fmt.Println("  fetch --name <name> [--reason <reason>]")
+	fmt.Println("  read --path <path> [--reason <reason>]")
 }

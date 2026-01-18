@@ -8,9 +8,9 @@ struct SecretaCLI {
         }
 
         var options = parseOptions(arguments: Array(arguments.dropFirst()))
+        options.removeValue(forKey: "--timeout")
         let socketPath = options.removeValue(forKey: "--socket") ?? AppConfig.defaultConfig().socketPath
-        let timeoutSeconds = options.removeValue(forKey: "--timeout").flatMap(Double.init) ?? 30
-        let client = SecretaClient(socketPath: socketPath, timeout: timeoutSeconds)
+        let client = SecretaClient(socketPath: socketPath, timeout: 45)
 
         let positionals = positionalArguments(arguments: Array(arguments.dropFirst()))
 
@@ -31,7 +31,7 @@ struct SecretaCLI {
     }
 
     private static func handleFile(client: SecretaClient, arguments: [String]) {
-        guard let subcommand = arguments.first, subcommand == "edit" else {
+        guard let subcommand = arguments.first else {
             printUsage()
             return
         }
@@ -41,15 +41,28 @@ struct SecretaCLI {
         }
         let path = arguments[1]
 
-        do {
-            let editor = DefaultEditor()
-            let fileEditor = FileEditor(client: client, editor: editor)
-            let resolvedPath = try fileEditor.edit(path: path)
-            print("encrypted \(resolvedPath.path)")
-        } catch FileEditorError.noTTY {
-            print("no TTY detected; set EDITOR/VISUAL to a GUI editor with --wait")
-        } catch {
-            print("\(error)")
+        switch subcommand {
+        case "edit":
+            do {
+                let editor = DefaultEditor()
+                let fileEditor = FileEditor(client: client, editor: editor)
+                let resolvedPath = try fileEditor.edit(path: path)
+                print("encrypted \(resolvedPath.path)")
+            } catch FileEditorError.noTTY {
+                print("no TTY detected; set EDITOR/VISUAL to a GUI editor with --wait")
+            } catch {
+                print("\(error)")
+            }
+        case "read":
+            do {
+                let resolvedPath = FilePathResolver.resolve(path)
+                let response = try client.readFile(path: resolvedPath.path, reason: nil)
+                print(response.plaintext)
+            } catch {
+                print("\(error)")
+            }
+        default:
+            printUsage()
         }
     }
 
@@ -154,11 +167,12 @@ struct SecretaCLI {
     static func printUsage() {
         print("secreta <command> [options]")
         print("commands:")
-        print("  create --name <name> --value <value> [--cache-seconds <seconds>] [--socket <path>] [--timeout <seconds>]")
-        print("  fetch --name <name> [--reason <reason>] [--socket <path>] [--timeout <seconds>]")
-        print("  delete --name <name> [--socket <path>] [--timeout <seconds>]")
-        print("  status [--socket <path>] [--timeout <seconds>]")
-        print("  file edit <path> [--socket <path>] [--timeout <seconds>]")
+        print("  create --name <name> --value <value> [--cache-seconds <seconds>] [--socket <path>]")
+        print("  fetch --name <name> [--reason <reason>] [--socket <path>]")
+        print("  delete --name <name> [--socket <path>]")
+        print("  status [--socket <path>]")
+        print("  file edit <path> [--socket <path>]")
+        print("  file read <path> [--socket <path>]")
         print("  daemon run")
     }
 }

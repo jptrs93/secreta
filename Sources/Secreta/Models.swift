@@ -66,6 +66,15 @@ struct SecretDeleteResponse: Codable {
     let deleted: Bool
 }
 
+struct FileReadRequest: Codable {
+    let path: String
+    let reason: String?
+}
+
+struct FileReadResponse: Codable {
+    let plaintext: String
+}
+
 struct HealthResponse: Codable {
     let version: String
     let uptime: TimeInterval
