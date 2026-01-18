@@ -2,7 +2,7 @@ import Foundation
 import os.log
 
 enum LoggerFactory {
-    static let subsystem = "com.example.secreta"
+    static let subsystem = "com.secreta"
 
     static func make(_ category: String) -> Logger {
         return Logger(subsystem: subsystem, category: category)
@@ -37,7 +37,7 @@ final class NotificationCenterBridge {
     private let notificationCenter = DistributedNotificationCenter.default()
 
     func postSecretAccess(event: AuditEvent) {
-        let name = Notification.Name("com.example.secreta.access")
+        let name = Notification.Name("com.secreta.access")
         var userInfo: [String: Any] = [
             "request_id": event.requestId.uuidString,
             "client_name": event.client.binaryName,

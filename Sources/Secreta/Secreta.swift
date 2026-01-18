@@ -44,6 +44,7 @@ struct SecretaApp {
         do {
             let server = try SocketServer(socketPath: config.socketPath, handler: router, identitySink: policy)
             logger.info("starting secreta socket on \(config.socketPath)")
+            logger.info("secreta daemon pid=\(ProcessInfo.processInfo.processIdentifier)")
             server.start()
             RunLoop.current.run()
         } catch {
