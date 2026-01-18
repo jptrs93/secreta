@@ -104,11 +104,16 @@ import (
 )
 
 func main() {
-    client := secreta.NewClient()
-    response, err := client.FetchSecret("demo", "testing")
+    response, err := secreta.FetchSecret("demo", "testing")
     if err != nil {
         panic(err)
     }
     fmt.Println(response.SecretValue)
+
+    fileResponse, err := secreta.ReadFile("/path/to/myfile.secret", "testing")
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println(fileResponse.Plaintext)
 }
 ```

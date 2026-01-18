@@ -4,14 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/jptrs93/secreta/sdk/go/secreta"
 )
 
 func main() {
 	socketPath := flag.String("socket", "", "Unix socket path")
-	timeout := flag.Duration("timeout", 5*time.Second, "Socket timeout")
 	flag.Parse()
 
 	args := flag.Args()
@@ -20,28 +18,24 @@ func main() {
 		os.Exit(1)
 	}
 
-	client := secreta.NewClient()
 	if *socketPath != "" {
-		client.SocketPath = *socketPath
-	}
-	if *timeout != 0 {
-		client.Timeout = *timeout
+		secreta.SocketPath = *socketPath
 	}
 
 	switch args[0] {
 	case "create":
-		handleCreate(client, args[1:])
+		handleCreate(args[1:])
 	case "fetch":
-		handleFetch(client, args[1:])
+		handleFetch(args[1:])
 	case "read":
-		handleRead(client, args[1:])
+		handleRead(args[1:])
 	default:
 		printUsage()
 		os.Exit(1)
 	}
 }
 
-func handleCreate(client *secreta.Client, args []string) {
+func handleCreate(args []string) {
 	fs := flag.NewFlagSet("create", flag.ExitOnError)
 	name := fs.String("name", "", "Secret name")
 	value := fs.String("value", "", "Secret value")
@@ -58,7 +52,7 @@ func handleCreate(client *secreta.Client, args []string) {
 		ttl = cacheSeconds
 	}
 
-	response, err := client.CreateSecret(*name, *value, ttl, nil)
+	response, err := secreta.CreateSecret(*name, *value, ttl, nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -67,7 +61,7 @@ func handleCreate(client *secreta.Client, args []string) {
 	fmt.Printf("created secret %s (cache %ds)\n", response.StoredName, response.CacheSeconds)
 }
 
-func handleFetch(client *secreta.Client, args []string) {
+func handleFetch(args []string) {
 	fs := flag.NewFlagSet("fetch", flag.ExitOnError)
 	name := fs.String("name", "", "Secret name")
 	reason := fs.String("reason", "", "Reason for access")
@@ -78,7 +72,7 @@ func handleFetch(client *secreta.Client, args []string) {
 		os.Exit(1)
 	}
 
-	response, err := client.FetchSecret(*name, *reason)
+	response, err := secreta.FetchSecret(*name, *reason)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -87,7 +81,7 @@ func handleFetch(client *secreta.Client, args []string) {
 	fmt.Println(response.SecretValue)
 }
 
-func handleRead(client *secreta.Client, args []string) {
+func handleRead(args []string) {
 	fs := flag.NewFlagSet("read", flag.ExitOnError)
 	path := fs.String("path", "", "File path")
 	reason := fs.String("reason", "", "Reason for access")
@@ -98,7 +92,7 @@ func handleRead(client *secreta.Client, args []string) {
 		os.Exit(1)
 	}
 
-	response, err := client.ReadFile(*path, *reason)
+	response, err := secreta.ReadFile(*path, *reason)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

@@ -13,14 +13,8 @@ import (
 	"time"
 )
 
-const (
-	defaultSocketPath = "/tmp/secreta.sock"
-)
-
-type Client struct {
-	SocketPath string
-	Timeout    time.Duration
-}
+var SocketPath = "/tmp/secreta.sock"
+var SocketTimeout = 45 * time.Second
 
 type ErrorEnvelope struct {
 	Code      string            `json:"code"`
@@ -75,14 +69,7 @@ type FileReadResponse struct {
 	Plaintext string `json:"plaintext"`
 }
 
-func NewClient() *Client {
-	return &Client{
-		SocketPath: defaultSocketPath,
-		Timeout:    45 * time.Second,
-	}
-}
-
-func (c *Client) CreateSecret(name string, value string, cacheSeconds *int, metadata map[string]string) (*SecretCreateResponse, error) {
+func CreateSecret(name string, value string, cacheSeconds *int, metadata map[string]string) (*SecretCreateResponse, error) {
 	request := SecretCreateRequest{
 		Name:         name,
 		SecretValue:  value,
@@ -93,7 +80,7 @@ func (c *Client) CreateSecret(name string, value string, cacheSeconds *int, meta
 	if err != nil {
 		return nil, err
 	}
-	response, err := c.sendRequest("secret.create", payload)
+	response, err := sendRequest("secret.create", payload)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +91,7 @@ func (c *Client) CreateSecret(name string, value string, cacheSeconds *int, meta
 	return &result, nil
 }
 
-func (c *Client) FetchSecret(name string, reason string) (*SecretAccessResponse, error) {
+func FetchSecret(name string, reason string) (*SecretAccessResponse, error) {
 	request := SecretAccessRequest{
 		Name:   name,
 		Reason: reason,
@@ -113,7 +100,7 @@ func (c *Client) FetchSecret(name string, reason string) (*SecretAccessResponse,
 	if err != nil {
 		return nil, err
 	}
-	response, err := c.sendRequest("secret.access", payload)
+	response, err := sendRequest("secret.access", payload)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +111,7 @@ func (c *Client) FetchSecret(name string, reason string) (*SecretAccessResponse,
 	return &result, nil
 }
 
-func (c *Client) ReadFile(path string, reason string) (*FileReadResponse, error) {
+func ReadFile(path string, reason string) (*FileReadResponse, error) {
 	resolved := path
 	if !filepath.IsAbs(path) {
 		if abs, err := filepath.Abs(path); err == nil {
@@ -139,7 +126,7 @@ func (c *Client) ReadFile(path string, reason string) (*FileReadResponse, error)
 	if err != nil {
 		return nil, err
 	}
-	response, err := c.sendRequest("file.read", payload)
+	response, err := sendRequest("file.read", payload)
 	if err != nil {
 		return nil, err
 	}
@@ -150,9 +137,9 @@ func (c *Client) ReadFile(path string, reason string) (*FileReadResponse, error)
 	return &result, nil
 }
 
-func (c *Client) sendRequest(method string, params []byte) ([]byte, error) {
-	if c.SocketPath == "" {
-		c.SocketPath = defaultSocketPath
+func sendRequest(method string, params []byte) ([]byte, error) {
+	if SocketPath == "" {
+		SocketPath = "/tmp/secreta.sock"
 	}
 
 	requestID, err := newRequestID()
@@ -173,13 +160,13 @@ func (c *Client) sendRequest(method string, params []byte) ([]byte, error) {
 
 	framed := frame(payload)
 
-	conn, err := net.DialTimeout("unix", c.SocketPath, c.Timeout)
+	conn, err := net.DialTimeout("unix", SocketPath, SocketTimeout)
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
 
-	if err := conn.SetDeadline(time.Now().Add(c.Timeout)); err != nil {
+	if err := conn.SetDeadline(time.Now().Add(SocketTimeout)); err != nil {
 		return nil, err
 	}
 
