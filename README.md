@@ -1,6 +1,6 @@
 # Secret Agent (`secreta`)
 
-Secret agent is a local macOS daemon that brokers secret creation and access over a Unix domain socket. It acts as an intermediary between other applications and keychain stored secrets and providing the following features:
+Secret agent is a local macOS daemon that brokers secret creation and access over a Unix domain socket. It acts as an intermediary between other applications and keychain stored secrets providing the following features:
 
 * Per application access control.
 * Usable from both signed and unsigned applications. 
@@ -10,11 +10,11 @@ Secret agent is a local macOS daemon that brokers secret creation and access ove
 
 ## Design
 
-The agent runs as a background process that owns all keychain interactions. Clients connect over a Unix domain socket using a length-prefixed JSON protocol. The agent identifies callers by CDHash and uses the binary name and path for user-facing context. All access attempts emit audit notifications. Secrets are never stored in memory in the agent, they are retrieved from keychain on ever access.
+The agent runs as a background process that owns all keychain interactions. Clients connect over a Unix domain socket using a length-prefixed JSON protocol. All access attempts emit audit notifications and are logged. Secrets are never stored in memory in the agent, they are retrieved from keychain on every access.
 
-App identity is rooted in the caller's CDHash, while user-facing prompts and audit records include the binary name and path so humans can recognize the source. This mapping is part of the policy metadata used to determine per-app access behavior.
+Calling applications are identified by their CDHash where available. Otherwise, a combination of the path to their binary and hash of their binary is used.
 
-The design works with either legacy keychain items or the data protection keychain, since the agent always owns the keychain operations. The current implementation uses legacy keychain items for simplicity, but the same flow applies if the storage backend changes.
+The design would work ontop of either legacy keychain or the data protection keychain. The current implementation uses legacy keychain for simplicity.
 
 Authentication prompts shown to the user are local authentication challenges from the agent, not keychain prompts. This means the security model relies on the integrity of the agent binary itself and the keychain ACL only permitting that binary; if the agent identity changes, it would need to re-authenticate to access existing secrets.
 
@@ -30,8 +30,9 @@ Build and install a user-level launch agent with the provided scripts. This inst
 
 The install script has the following effects on your machine:
 
-- Installs the `secreta` binary into `~/.local/bin` (or the `INSTALL_DIR` override).
-- Registers `com.secreta.agent` under `~/Library/LaunchAgents` for auto-start.
+- Installs the `secreta` CLI binary into `~/.local/bin` (or the `INSTALL_DIR` override).
+- Builds and installs `SecretaDaemon.app` into `~/Applications` (or the `APP_INSTALL_DIR` override).
+- Registers `com.secreta.agent` under `~/Library/LaunchAgents` to start the bundled daemon.
 - Removes any stale `/tmp/secreta.sock` and restarts the agent to recreate it.
 
 ```bash
@@ -56,23 +57,25 @@ Audit logs are emitted through macOS unified logging under the `com.secreta` sub
 
 ## CLI
 
-Run the daemon with `secreta daemon run`. Use the direct commands for quick manual testing.
+Use the direct commands for quick manual testing.
 
 ```bash
-swift run secreta create --name demo --value test
-swift run secreta fetch --name demo
-swift run secreta file edit /path/to/myfile.secret
+secreta create --name demo --value test
+secreta fetch --name demo
+secreta delete --name demo
+secreta file edit /path/to/myfile.secret
+secreta file read /path/to/myfile.secret
 ```
 
 Options:
 
 - `--socket` override the Unix socket path (default: /tmp/secreta.sock)
-- `--timeout` socket timeout in seconds
 - `--cache-seconds` cache TTL for create
 - `--reason` access reason for fetch
 - `delete` requires `--name`
 - `status` checks the socket health
 - `file edit <path>` opens an encrypted file editor
+- `file read <path>` prints the decrypted contents
 
 File editing notes:
 
