@@ -61,8 +61,7 @@ type SecretAccessResponse struct {
 }
 
 type FileReadRequest struct {
-	Path   string `json:"path"`
-	Reason string `json:"reason,omitempty"`
+	Path string `json:"path"`
 }
 
 type FileReadResponse struct {
@@ -111,7 +110,7 @@ func FetchSecret(name string, reason string) (*SecretAccessResponse, error) {
 	return &result, nil
 }
 
-func ReadFile(path string, reason string) (*FileReadResponse, error) {
+func ReadFile(path string) (*FileReadResponse, error) {
 	resolved := path
 	if !filepath.IsAbs(path) {
 		if abs, err := filepath.Abs(path); err == nil {
@@ -119,8 +118,7 @@ func ReadFile(path string, reason string) (*FileReadResponse, error) {
 		}
 	}
 	request := FileReadRequest{
-		Path:   resolved,
-		Reason: reason,
+		Path: resolved,
 	}
 	payload, err := json.Marshal(request)
 	if err != nil {

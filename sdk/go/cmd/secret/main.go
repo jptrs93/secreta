@@ -84,7 +84,6 @@ func handleFetch(args []string) {
 func handleRead(args []string) {
 	fs := flag.NewFlagSet("read", flag.ExitOnError)
 	path := fs.String("path", "", "File path")
-	reason := fs.String("reason", "", "Reason for access")
 	fs.Parse(args)
 
 	if *path == "" {
@@ -92,7 +91,7 @@ func handleRead(args []string) {
 		os.Exit(1)
 	}
 
-	response, err := secreta.ReadFile(*path, *reason)
+	response, err := secreta.ReadFile(*path)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -106,5 +105,5 @@ func printUsage() {
 	fmt.Println("commands:")
 	fmt.Println("  create --name <name> --value <value> [--cache-seconds <seconds>]")
 	fmt.Println("  fetch --name <name> [--reason <reason>]")
-	fmt.Println("  read --path <path> [--reason <reason>]")
+	fmt.Println("  read --path <path>")
 }

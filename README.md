@@ -110,7 +110,7 @@ func main() {
     }
     fmt.Println(response.SecretValue)
 
-    fileResponse, err := secreta.ReadFile("/path/to/myfile.secret", "testing")
+    fileResponse, err := secreta.ReadFile("/path/to/myfile.secret")
     if err != nil {
         panic(err)
     }
