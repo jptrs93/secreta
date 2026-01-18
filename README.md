@@ -117,3 +117,13 @@ func main() {
     fmt.Println(fileResponse.Plaintext)
 }
 ```
+
+## TODO
+
+* Make daemon a fully signed application with apple developer account.
+* Fix tray notifications and format more nicely.
+* Improve audit log, consider dedicated audit log file.
+* Add GUI showing all existing secrets and files
+* Expand to SSH keys and SSH agent, similar to Secrative.
+* Add SDK's for other languages.
+* Switch to data protection keychain. 
